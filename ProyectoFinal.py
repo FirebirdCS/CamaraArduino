@@ -1,11 +1,11 @@
 #El archivo .xml esta fuera de la carpeta ProyectoFinalProgra3
-import cv2, serial, time
+import cv2, serial, time #librerias
 
 face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
 
 cap = cv2.VideoCapture(0)
-cap.set(cv2.CAP_PROP_FPS, 30)
-ser = serial.Serial('COM4', 9600)
+cap.set(cv2.CAP_PROP_FPS, 30)#FPS cuadros por segundo
+ser = serial.Serial('COM4', 9600) #puerto serial este puede cambiar depende maquina
 
 while True:
     _, img = cap.read()
@@ -17,7 +17,7 @@ while True:
     faces = face_cascade.detectMultiScale(gray, 1.1, 4)
 
     if len(faces) > 0:
-        time.sleep(2)
+        time.sleep(2)#pausa en segundos
         ser.write(b'1')  # Enviar comando '1' si se detecta un rostro
         print("Comando enviado: 1")
     else:
@@ -30,6 +30,7 @@ while True:
 
     cv2.imshow('Proyecto Final', img)
 
+    #salir del programa
     teclaEsc = cv2.waitKey(30)
     if teclaEsc == 27:  # Presionar la tecla 'Esc' para salir
         break
