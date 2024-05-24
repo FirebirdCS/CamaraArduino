@@ -132,6 +132,6 @@ class App:
 
 if __name__ == "__main__":
     root = tk.Tk()
-    app = App(root, 'COM4', 'haarcascade_frontalface_default.xml')#COM4 cambiarlo por el puerto de la laptop
+    app = App(root, 'COM3', 'haarcascade_frontalface_default.xml')#COM3 cambiarlo por el puerto de la laptop
     root.protocol("WM_DELETE_WINDOW", app.on_closing)
     root.mainloop()
