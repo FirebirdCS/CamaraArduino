@@ -28,7 +28,7 @@ class DatabaseHandler:
 
     def insert_message(self, message):
         insert_statement = """
-            INSERT INTO ArduinoInfo
+            INSERT INTO ArduinoInfo (info)
             VALUES (?);
         """
         try:
@@ -44,123 +44,122 @@ class DatabaseHandler:
             self.db.close()
             print("Conexión a la base de datos cerrada")
 
-# Configurar la comunicación serial
-ser = serial.Serial('COM3', 9600)
+class SerialReader:
+    def __init__(self, port, baudrate, gui, db_handler):
+        self.ser = serial.Serial(port, baudrate)
+        self.gui = gui
+        self.db_handler = db_handler
 
-# Crear instancia de la clase DatabaseHandler
-db_handler = DatabaseHandler('SQL Server', 'localhost', 'dbCamaraArduino')
+    def read_serial(self):
+        while True:
+            if self.ser.in_waiting > 0:
+                data = self.ser.readline().decode().strip()
+                if data:
+                    self.handle_code(data)
 
-# Función para leer datos del puerto serie
-def serial_reader():
-    while True:
-        if ser.in_waiting > 0:
-            data = ser.readline().decode().strip()
-            if data:
-                handle_code(data)
+    def handle_code(self, code):
+        try:
+            digit = int(code)
+            print("Código recibido:", digit)
+        except ValueError:
+            print("Mensaje desde Arduino:", code.strip())
+            self.db_handler.insert_message(code)
+            self.gui.update_buttons(code)
 
-def handle_code(code):
-    try:
-        digit = int(code)
-        print("Código recibido:", digit)
-    except ValueError:
-        print("Mensaje desde Arduino:", code.strip())
-        # Insertar mensaje en la base de datos
-        db_handler.insert_message(code)
-        
-        # Actualizar los círculos en la interfaz
-        if code == 'Se abrio puerta':
-            button_canvas.itemconfig(button_1, fill="green")
-            button_canvas.itemconfig(button_0, fill="white")
-        elif code == 'Se cerro puerta':
-            button_canvas.itemconfig(button_0, fill="red")
-            button_canvas.itemconfig(button_1, fill="white")
+    def send_command(self, command):
+        self.ser.write(command.encode())
+        print(f"Comando enviado: {command}")
+        self.gui.update_buttons(command)
 
-def send_command(command):
-    ser.write(command.encode())
-    print(f"Comando enviado: {command}")
-    if command == '1':
-        button_canvas.itemconfig(button_1, fill="green")
-        button_canvas.itemconfig(button_0, fill="white")
-    elif command == '0':
-        button_canvas.itemconfig(button_0, fill="red")
-        button_canvas.itemconfig(button_1, fill="white")
+class CameraHandler:
+    def __init__(self, cascade_path, gui, serial_reader):
+        self.face_cascade = cv2.CascadeClassifier(cascade_path)
+        self.cap = cv2.VideoCapture(0)
+        self.cap.set(cv2.CAP_PROP_FPS, 30)
+        self.gui = gui
+        self.serial_reader = serial_reader
 
-def update_frame():
-    _, img = cap.read()
-    if not _:
-        print("Error al leer la imagen de la cámara.")
-        return
+    def update_frame(self):
+        _, img = self.cap.read()
+        if not _:
+            print("Error al leer la imagen de la cámara.")
+            return
 
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    faces = face_cascade.detectMultiScale(gray, 1.1, 4)
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        faces = self.face_cascade.detectMultiScale(gray, 1.1, 4)
 
-    if len(faces) > 0:
-        time.sleep(2)
-        send_command('1')  # Enviar comando '1' si se detecta un rostro
-    else:
-        time.sleep(2)
-        send_command('0')  # Enviar comando '0' si no se detecta ningún rostro
+        if len(faces) > 0:
+            time.sleep(2)
+            self.serial_reader.send_command('1')
+        else:
+            time.sleep(2)
+            self.serial_reader.send_command('0')
 
-    for (x, y, w, h) in faces:
-        cv2.rectangle(img, (x, y), (x+w, y+h), (255, 0, 0), 2)
+        for (x, y, w, h) in faces:
+            cv2.rectangle(img, (x, y), (x+w, y+h), (255, 0, 0), 2)
 
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    img = Image.fromarray(img)
-    imgtk = ImageTk.PhotoImage(image=img)
-    label.imgtk = imgtk
-    label.configure(image=imgtk)
-    label.after(30, update_frame)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img = Image.fromarray(img)
+        imgtk = ImageTk.PhotoImage(image=img)
+        self.gui.update_image(imgtk)
+        self.gui.schedule_update(self.update_frame)
 
-def abrir_puerta():
-    send_command('1')
+    def release(self):
+        self.cap.release()
 
-def cerrar_puerta():
-    send_command('0')
+class GUI:
+    def __init__(self):
+        self.root = tk.Tk()
+        self.root.title("Proyecto Final")
 
-# Cargar el clasificador de rostros
-face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
+        self.main_frame = tk.Frame(self.root)
+        self.main_frame.pack(fill=tk.BOTH, expand=True)
 
-# Capturar video de la cámara
-cap = cv2.VideoCapture(0)
-cap.set(cv2.CAP_PROP_FPS, 30)
+        self.canvas = tk.Canvas(self.main_frame, width=640, height=480)
+        self.canvas.pack()
 
-# Crear la ventana principal
-root = tk.Tk()
-root.title("Proyecto Final")
+        self.label = tk.Label(self.canvas)
+        self.label.pack()
 
-# Crear un marco principal
-main_frame = tk.Frame(root)
-main_frame.pack(fill=tk.BOTH, expand=True)
+        self.button_canvas = tk.Canvas(self.main_frame, width=640, height=100, bg='white')
+        self.button_canvas.pack()
 
-# Crear un canvas para la imagen de la cámara
-canvas = tk.Canvas(main_frame, width=640, height=480)
-canvas.pack()
+        self.button_1 = self.button_canvas.create_oval(70, 20, 130, 80, outline="black", fill="white")
+        self.button_0 = self.button_canvas.create_oval(510, 20, 570, 80, outline="black", fill="white")
 
-# Crear un label para mostrar la imagen de la cámara
-label = tk.Label(canvas)
-label.pack()
+    def update_buttons(self, code):
+        if code == 'Se abrio puerta' or code == '1':
+            self.button_canvas.itemconfig(self.button_1, fill="green")
+            self.button_canvas.itemconfig(self.button_0, fill="white")
+        elif code == 'Se cerro puerta' or code == '0':
+            self.button_canvas.itemconfig(self.button_0, fill="red")
+            self.button_canvas.itemconfig(self.button_1, fill="white")
 
-# Crear otro canvas para los botones
-button_canvas = tk.Canvas(main_frame, width=640, height=100, bg='white')
-button_canvas.pack()
+    def update_image(self, imgtk):
+        self.label.imgtk = imgtk
+        self.label.configure(image=imgtk)
 
-# Crear botones circulares en el canvas de botones
-button_1 = button_canvas.create_oval(70, 20, 130, 80, outline="black", fill="white")
-button_0 = button_canvas.create_oval(510, 20, 570, 80, outline="black", fill="white")
+    def schedule_update(self, func):
+        self.label.after(30, func)
 
-# Crear y ejecutar el hilo para leer datos del puerto serie
-serial_thread = threading.Thread(target=serial_reader)
-serial_thread.daemon = True
-serial_thread.start()
+    def start(self):
+        self.root.mainloop()
 
-# Iniciar la actualización de frames
-update_frame()
+def main():
+    db_handler = DatabaseHandler('SQL Server', 'localhost', 'dbCamaraArduino')
+    gui = GUI()
+    serial_reader = SerialReader('COM3', 9600, gui, db_handler)
+    camera_handler = CameraHandler('haarcascade_frontalface_default.xml', gui, serial_reader)
 
-# Iniciar el bucle principal de Tkinter
-root.mainloop()
+    serial_thread = threading.Thread(target=serial_reader.read_serial)
+    serial_thread.daemon = True
+    serial_thread.start()
 
-# Liberar la captura de video
-cap.release()
+    gui.schedule_update(camera_handler.update_frame)
+    gui.start()
 
-# Cerrar la conexión a la base de datos
-db_handler.close()
+    camera_handler.release()
+    db_handler.close()
+
+if __name__ == "__main__":
+    main()
