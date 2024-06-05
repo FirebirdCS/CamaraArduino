@@ -28,7 +28,7 @@ class DatabaseHandler:
 
     def insert_message(self, message):
         insert_statement = """
-            INSERT INTO ArduinoInfo (info)
+            INSERT INTO ArduinoInfo
             VALUES (?);
         """
         try:
