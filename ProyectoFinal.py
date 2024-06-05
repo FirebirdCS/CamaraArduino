@@ -3,10 +3,52 @@ import serial
 import time
 import threading
 import tkinter as tk
+import sys
+import pypyodbc as odbc
 from PIL import Image, ImageTk
+
+class DatabaseHandler:
+    def __init__(self, driver_name, server_name, database_name):
+        self.connection_string = f"""
+            DRIVER={{{driver_name}}};
+            SERVER={{{server_name}}};
+            DATABASE={{{database_name}}};
+            Trust_Connection=yes;
+        """
+        self.connect()
+
+    def connect(self):
+        try:
+            self.db = odbc.connect(self.connection_string)
+        except Exception as e:
+            print(e)
+            sys.exit()
+        else:
+            self.cursor = self.db.cursor()
+
+    def insert_message(self, message):
+        insert_statement = """
+            INSERT INTO ArduinoInfo
+            VALUES (?);
+        """
+        try:
+            self.cursor.execute(insert_statement, [message])
+            self.db.commit()
+        except Exception as e:
+            self.db.rollback()
+            print(f"Error al insertar en la base de datos: {e}")
+
+    def close(self):
+        if self.db.connected == 1:
+            self.cursor.close()
+            self.db.close()
+            print("Conexión a la base de datos cerrada")
 
 # Configurar la comunicación serial
 ser = serial.Serial('COM3', 9600)
+
+# Crear instancia de la clase DatabaseHandler
+db_handler = DatabaseHandler('SQL Server', 'localhost', 'dbCamaraArduino')
 
 # Función para leer datos del puerto serie
 def serial_reader():
@@ -22,6 +64,10 @@ def handle_code(code):
         print("Código recibido:", digit)
     except ValueError:
         print("Mensaje desde Arduino:", code.strip())
+        # Insertar mensaje en la base de datos
+        db_handler.insert_message(code)
+        
+        # Actualizar los círculos en la interfaz
         if code == 'Se abrio puerta':
             button_canvas.itemconfig(button_1, fill="green")
             button_canvas.itemconfig(button_0, fill="white")
@@ -115,3 +161,6 @@ root.mainloop()
 
 # Liberar la captura de video
 cap.release()
+
+# Cerrar la conexión a la base de datos
+db_handler.close()
