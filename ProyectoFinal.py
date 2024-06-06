@@ -6,7 +6,7 @@ import tkinter as tk
 from PIL import Image, ImageTk
 
 # Configurar la comunicación serial
-ser = serial.Serial('COM3', 9600)
+ser = serial.Serial('COM4', 9600)
 
 # Función para leer datos del puerto serie
 def serial_reader():

@@ -1,0 +1,51 @@
+//Codigo Arduino: 
+#include <Servo.h>  // Incluir la librería Servo para controlar servomotores
+
+Servo servoMotor;  // Crear un objeto de tipo Servo
+
+// Declarar variables para los ángulos y los pines
+int angulo = 0, cerrarPuerta = 3, abrirPuerta = 4;
+
+void setup() {
+  servoMotor.attach(2);  // Conectar el servo al pin digital 2 del Arduino
+
+  pinMode(abrirPuerta, OUTPUT);  // Configurar el pin 4 como salida para "abrir puerta"
+  pinMode(cerrarPuerta, OUTPUT); // Configurar el pin 3 como salida para "cerrar puerta"
+
+  Serial.begin(9600);  // Iniciar la comunicación serial a 9600 baudios
+}
+
+void loop() {
+  // Verificar si hay datos disponibles en el puerto serial
+  if (Serial.available() > 0) {
+    // Leer un byte del puerto serial
+    char numMonitorSerial = Serial.read();
+
+    // Si se recibe un '1', se abre la puerta
+    if (numMonitorSerial == '1') {
+      Serial.println("Se abrio puerta");  // Imprimir mensaje en el monitor serial
+      digitalWrite(abrirPuerta, HIGH);  // Activar señal de apertura de puerta
+
+      // Mover el servo de 0 a 90 grados, en incrementos de 1 grado
+      for (angulo = 0; angulo <= 90; angulo += 1) {
+        servoMotor.write(angulo);  // Establecer el ángulo del servo
+        delay(20);  // Esperar 20 milisegundos para dar tiempo al servo de moverse
+      }
+
+      digitalWrite(abrirPuerta, LOW);  // Desactivar señal de apertura de puerta
+    }
+    // Si se recibe un '0', se cierra la puerta
+    else if (numMonitorSerial == '0') {
+      Serial.println("Se cerro puerta");  // Imprimir mensaje en el monitor serial
+      digitalWrite(cerrarPuerta, HIGH);  // Activar señal de cierre de puerta
+
+      // Mover el servo de 90 a 0 grados, en decrementos de 1 grado
+      for (angulo = 90; angulo >= 0; angulo -= 1) {
+        servoMotor.write(angulo);  // Establecer el ángulo del servo
+        delay(20);  // Esperar 20 milisegundos para dar tiempo al servo de moverse
+      }
+
+      digitalWrite(cerrarPuerta, LOW);  // Desactivar señal de cierre de puerta
+    }
+  }
+}
